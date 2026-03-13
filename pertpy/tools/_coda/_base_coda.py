@@ -481,6 +481,7 @@ class CompositionalModel2(ABC):
             *args,  # noqa: B026
             **kwargs,
         )
+        summ = summ.convert_dtypes(dtype_backend="numpy_nullable").infer_objects()
 
         posterior = arviz_data["posterior"].to_dataset()
         summ["median"] = posterior[var_names].median(dim=["chain", "draw"]).to_dataframe().stack().reindex(summ.index)
@@ -548,6 +549,7 @@ class CompositionalModel2(ABC):
                 *args,  # noqa: B026
                 **kwargs,
             )
+            summary_sel = summary_sel.convert_dtypes(dtype_backend="numpy_nullable").infer_objects()
 
             ref_index = sample_adata.uns["scCODA_params"]["reference_index"]
             n_conditions = len(covariates)
@@ -569,8 +571,8 @@ class CompositionalModel2(ABC):
                     pd.DataFrame.from_dict(data={"mean": [0], "sd": [0], hdis[0]: [0], hdis[1]: [0]}),
                 )
 
-            effect_df.loc[:, hdis[0]] = list(summary_sel[hdis[0]])
-            effect_df.loc[:, hdis[1]] = list(summary_sel.loc[:, hdis[1]])  # type: ignore
+            effect_df[hdis[0]] = summary_sel[hdis[0]].to_numpy(dtype=float, na_value=np.nan)
+            effect_df[hdis[1]] = summary_sel[hdis[1]].to_numpy(dtype=float, na_value=np.nan)
         # For spike-and-slab LASSO, credible intervals are as calculated by `az.summary`
         elif select_type == "sslasso":
             pass
@@ -732,7 +734,7 @@ class CompositionalModel2(ABC):
 
         # Get expected sample, log-fold change
         y_bar = np.mean(np.sum(sample_adata.X, axis=1))
-        alpha_par = intercept_df.loc[:, "final_parameter"]
+        alpha_par = intercept_df.loc[:, "final_parameter"].astype(float)
         alphas_exp = np.exp(alpha_par)
         alpha_sample = (alphas_exp / np.sum(alphas_exp) * y_bar).values
 
@@ -805,7 +807,7 @@ class CompositionalModel2(ABC):
 
         # Get expected sample
         y_bar = np.mean(np.sum(sample_adata.X, axis=1))
-        alphas_exp = np.exp(intercept_df.loc[:, "final_parameter"])
+        alphas_exp = np.exp(intercept_df.loc[:, "final_parameter"].astype(float))
         alpha_sample = (alphas_exp / np.sum(alphas_exp) * y_bar).values
         intercept_df.loc[:, "expected_sample"] = alpha_sample
 
